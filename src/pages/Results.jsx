@@ -6,7 +6,12 @@ import { collection, addDoc, db, doc, setDoc } from "../utils/firebase";
 
 import { summarizeTrip } from "../utils/gemini";
 import AISuggestionModal from "../components/AISuggestionModal";
-import { getWeather } from "../utils/weather";
+import { fetchWeather, getWeather } from "../utils/weather";
+import TripMap from "../components/TripMap";
+import TripMapDirection from "../components/TripMapDirection";
+import WeatherWidget from "../components/WeatherWidget";
+import Chat2 from "../widgets/Chat2";
+import { exportTripToPDF } from "../utils/pdf";
 
 export default function Results({ trip, onBack, user, onUpdateTrip }) {
   const [summary, setSummary] = useState("");
@@ -84,11 +89,18 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
     async function loadWeather() {
       if (!trip?.location) return;
       // Assume trip has { location: { lat, lon } }
-      const w = await getWeather(trip.location.lat, trip.location.lon);
+      const w = await getWeather(
+        trip.location.lat,
+        trip.location?.lon || trip.location.lng
+      );
       setWeather(w);
+
+      fetchWeather(trip?.location.lat, trip?.location.lng).then(setForecast);
     }
     loadWeather();
   }, [trip]);
+  const [forecast, setForecast] = useState([]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -126,6 +138,7 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
           <p className="text-yellow-700 text-sm">{summary}</p>
         </div>
       )}
+
       {weather && (
         <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded mb-4">
           <h3 className="font-semibold text-blue-800 mb-1">
@@ -208,70 +221,32 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
               </div>
             </div>
           ))}
+          <div className="col-span-8 space-y-4">
+            <div className="bg-white rounded-2xl p-4 shadow">
+              <WeatherWidget location={trip.location} />
+            </div>
+          </div>
         </div>
 
         <div className="col-span-4 space-y-4">
           <div className="bg-white rounded-2xl p-4 shadow">
-            <h4 className="font-semibold mb-2">AI Assistant</h4>
-            {/* <Chat
+            <h4 className="font-semibold mb-2">Personalized Assistant</h4>
+            <Chat2
               trip={trip}
-              onTripUpdate={(update) => {
-                if (!update || update.action === "none") return;
-
-                const newTrip = { ...trip };
-
-                if (update.action === "add") {
-                  const dayIdx = newTrip.days.findIndex(
-                    (d) => d.day === update.day
-                  );
-                  if (dayIdx >= 0) {
-                    newTrip.days[dayIdx].items.push(...update.items);
-                  }
-                }
-
-                if (update.action === "replace") {
-                  const dayIdx = newTrip.days.findIndex(
-                    (d) => d.day === update.day
-                  );
-                  if (dayIdx >= 0) {
-                    newTrip.days[dayIdx].items = update.items;
-                  }
-                }
-
-                if (update.action === "remove") {
-                  const dayIdx = newTrip.days.findIndex(
-                    (d) => d.day === update.day
-                  );
-                  if (dayIdx >= 0) {
-                    newTrip.days[dayIdx].items = newTrip.days[
-                      dayIdx
-                    ].items.filter(
-                      (it) => !update.items.some((rm) => rm.title === it.title)
-                    );
-                  }
-                }
-                // update state + Firestore
-                onUpdateTrip(newTrip);
-                if (user) {
-                  const ref = doc(
-                    db,
-                    "users",
-                    user.uid,
-                    "itineraries",
-                    newTrip.id
-                  );
-                  setDoc(ref, newTrip);
-                }
-              }}
-            /> */}
-            <Chat
-              trip={trip}
+              weather={forecast}
               onTripUpdate={(update) => {
                 if (!update || update.action === "none") return;
                 setAiSuggestion(update); // 👈 open modal instead of applying
               }}
             />
-
+        {/* <Chat
+              trip={trip}
+              weather={forecast}
+              onTripUpdate={(update) => {
+                if (!update || update.action === "none") return;
+                setAiSuggestion(update); // 👈 open modal instead of applying
+              }}
+            /> */}
             <AISuggestionModal
               show={!!aiSuggestion}
               suggestion={aiSuggestion}
@@ -284,9 +259,12 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
           </div>
           <div className="bg-white rounded-2xl p-4 shadow">
             <h4 className="font-semibold mb-2">Map Preview</h4>
-            <div className="h-64 rounded bg-gray-100 flex items-center justify-center">
+            {/* <div className="h-64 rounded bg-gray-100 flex items-center justify-center">
               Google Maps preview (add API)
-            </div>
+            </div> */}
+
+            <TripMap location={trip.location} days={trip.days} />
+            {/* <TripMapDirection location={trip.location} days={trip.days} /> */}
             <div className="mt-3 text-sm text-gray-600">
               Route & distances provided by Maps API in full integration.
             </div>
@@ -299,9 +277,10 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
             <div className="text-sm text-gray-600">
               Est. Cost: ₹{trip.costEstimate}
             </div>
+
             <div className="mt-3">
               <button
-                onClick={() => alert("Exported PDF (demo)")}
+                onClick={() => exportTripToPDF(trip, user)}
                 className="w-full px-3 py-2 bg-green-600 text-white rounded"
               >
                 Export PDF

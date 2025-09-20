@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import Interests from "../widgets/Interests";
 import SampleData from "../utils/sample-data";
-import { v4 as uuidv4 } from "uuid"
+import { v4 as uuidv4 } from "uuid";
+import { fetchLatLng } from "../utils/geodecoding";
 
 export default function Onboarding({ onGenerate, user }) {
   const [destination, setDestination] = useState("Jaipur");
@@ -12,24 +13,69 @@ export default function Onboarding({ onGenerate, user }) {
 
   async function gen() {
     setLoading(true);
-    // Simulate backend + Gemini + Maps processing with local mock
-    await new Promise((r) => setTimeout(r, 900));
-    // Filter sample places by persona heuristics (simple scoring)
-    const tripId = uuidv4()
+    debugger;
+    // 1. Get lat/lng from Google Geocoding API
+    const location = await fetchLatLng(destination);
 
+    // 2. Simulate backend + Gemini + Maps processing with local mock
+    await new Promise((r) => setTimeout(r, 900));
+
+    // 3. Generate trip with SampleData
+    const tripId = uuidv4();
     const trip = {
       id: tripId,
       unsaved: true,
+      location, // <-- save { lat, lng }
       ...SampleData.generateTrip({ destination, days, budget, persona }),
     };
-    onGenerate(trip);
 
-    onGenerate(trip);
-
+    // 4. Pass to parent
     onGenerate(trip);
     setLoading(false);
   }
 
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    // Get lat/lng
+    const location = await fetchLatLng(destination);
+
+    const newTrip = {
+      id: Date.now().toString(),
+      title: destination,
+      days: Array.from({ length: days }, (_, i) => ({
+        day: i + 1,
+        items: [],
+      })),
+      budget,
+      costEstimate: budget,
+      location, // ⬅️ includes { lat, lng }
+      createdAt: new Date().toISOString(),
+      unsaved: true,
+    };
+
+    onGenerate(newTrip);
+  }
+
+  // async function fetchLatLng(place) {
+  //   try {
+  //     debugger
+  //     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+  //     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+  //       place
+  //     )}&key=${apiKey}`;
+  //     const res = await fetch(url);
+  //     const data = await res.json();
+
+  //     if (data.results.length > 0) {
+  //       return data.results[0].geometry.location; // { lat, lng }
+  //     }
+  //     return null;
+  //   } catch (err) {
+  //     console.error("❌ Geocoding failed:", err);
+  //     return null;
+  //   }
+  // }
   return (
     <div className="grid grid-cols-12 gap-6">
       <div className="col-span-7">
@@ -99,7 +145,7 @@ export default function Onboarding({ onGenerate, user }) {
             >
               {loading ? "Crafting itinerary..." : "Generate Itinerary"}
             </button>
-            <button
+            {/* <button
               onClick={() => onGenerate(SampleData.quickSample())}
               className="px-4 py-2 border rounded-lg"
             >
@@ -107,7 +153,7 @@ export default function Onboarding({ onGenerate, user }) {
             </button>
             <div className="text-sm text-gray-500">
               Demo will use mock AI & POI data.
-            </div>
+            </div> */}
           </div>
         </div>
 

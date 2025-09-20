@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { aiAssistant, askGemini, refineTripWithGemini } from "../utils/gemini";
 
-export default function Chat({ trip, onTripUpdate }) {
+export default function Chat({ trip, weather, onTripUpdate }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,8 +14,7 @@ export default function Chat({ trip, onTripUpdate }) {
     setMessages((m) => [...m, userMsg]);
     setInput("");
     setLoading(true);
-
-    const aiResponse = await aiAssistant(trip, input);
+    const aiResponse = await aiAssistant(trip, input, weather);
 
     if (aiResponse.mode === "chat") {
       setMessages((m) => [...m, { sender: "ai", text: aiResponse.message }]);

@@ -9,11 +9,16 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@react-google-maps/api": "^2.20.7",
     "axios": "^1.4.0",
     "clsx": "^1.2.1",
     "firebase": "^12.2.1",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
+    "leaflet": "^1.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

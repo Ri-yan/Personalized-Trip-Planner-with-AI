@@ -29,7 +29,7 @@ export default function Navbar({ user, setUser }) {
           <div className='w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold'>AI</div>
           <div>
             <div className='font-semibold text-gray-800'>AI Trip Planner</div>
-            <div className='text-xs text-gray-500'>Personalized • Adaptive • Google-first</div>
+            <div className='text-xs text-gray-500'>Personalized • Adaptive </div>
           </div>
         </div>
         <div className='flex items-center gap-3'>
