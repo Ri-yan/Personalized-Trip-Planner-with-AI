@@ -47,6 +47,12 @@ An AI-powered **travel planning web application** built with **React + Vite + Ta
 
 ---
 
+---
+## DEMO
+[![Watch the video](https://i.ytimg.com/vi/Zwk0ySQ0y10/sddefault.jpg)](https://drive.google.com/drive/folders/1_gHy84NNz1os2tFhVS0l2fXLEbw2dj6c)
+
+
+
 ## 📂 Project Structure
 
 ```

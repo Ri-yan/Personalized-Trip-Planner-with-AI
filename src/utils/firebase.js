@@ -19,21 +19,22 @@ import {
   updateDoc,
   onSnapshot,
 } from "firebase/firestore";
-
+import { getAnalytics } from "firebase/analytics";
 // TODO: Replace with your Firebase project credentials
 const firebaseConfig = {
-  apiKey: "AIzaSyBgqmyc6W1l6NGhbwXmGdeCmFiO3D9nkYc",
-  authDomain: "travel-assistant-f5cdc.firebaseapp.com",
-  projectId: "travel-assistant-f5cdc",
-  storageBucket: "travel-assistant-f5cdc.firebasestorage.app",
-  messagingSenderId: "782972037880",
-  appId: "1:782972037880:web:1c497892a7a3e4fe16a90d",
+  apiKey: import.meta.env.VITE_apiKey,
+  authDomain: import.meta.env.VITE_authDomain,
+  projectId: import.meta.env.VITE_projectId,
+  storageBucket: import.meta.env.VITE_storageBucket,
+  messagingSenderId: import.meta.env.VITE_messagingSenderId,
+  appId: import.meta.env.VITE_appId,
+  measurementId: import.meta.env.VITE_measurementId,
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
+const analytics = getAnalytics(app);
 const provider = new GoogleAuthProvider();
 
 export {
@@ -51,5 +52,5 @@ export {
   collection,
   addDoc,
   getDocs,
-  onSnapshot
+  onSnapshot,
 };
