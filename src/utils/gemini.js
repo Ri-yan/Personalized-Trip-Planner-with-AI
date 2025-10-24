@@ -13,7 +13,7 @@ if (MODE === "studio") {
   if (!API_KEY) console.error("❌ Missing VITE_GEMINI_API_KEY in .env");
 
   const genAI = new GoogleGenerativeAI(API_KEY);
-  studioModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  studioModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 }
 
 // ---- Vertex AI ----
