@@ -1,5 +1,5 @@
 // src/components/TripMap.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   GoogleMap,
   Marker,
@@ -11,20 +11,54 @@ import {
   TileLayer,
   Marker as LeafletMarker,
   Polyline as LeafletPolyline,
+  useMap,
 } from "react-leaflet";
 
-export default function TripMap({ location, days }) {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || null;
-  if (!location) return <div>No location available</div>;
-  // Collect points (city + activities with lat/lng if present)
-  const points = [location];
-  days.forEach((d) =>
-    d.items.forEach((it) => {
-      if (it.lat && it.lng) points.push({ lat: it.lat, lng: it.lng });
-    })
-  );
+function LeafletAutoCenter({ target }) {
+  const map = useMap();
+  useEffect(() => {
+    if (target && map) {
+      map.setView([target.lat, target.lng], 14, { animate: true });
+    }
+  }, [target, map]);
+  return null;
+}
 
-  // ✅ Fallback to Leaflet if no Google Maps key
+export default function TripMap({ location, days, centerTarget }) {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || null;
+
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: apiKey || "DUMMY_KEY", // always call the hook
+  });
+
+  const mapRef = useRef(null);
+
+  const points = [];
+  if (location) {
+    points.push(location);
+    days.forEach((d) =>
+      d.items.forEach((it) => {
+        if (it.lat && it.lng) points.push({ lat: it.lat, lng: it.lng });
+      })
+    );
+  }
+
+  useEffect(() => {
+    if (centerTarget && mapRef.current) {
+      try {
+        mapRef.current.panTo(centerTarget);
+        mapRef.current.setZoom(14);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [centerTarget]);
+
+  // Early returns are now safe since hooks have all been called above
+
+  if (!location) return <div>No location available</div>;
+
+  // Show Leaflet if no key
   if (!apiKey) {
     return (
       <MapContainer
@@ -34,27 +68,25 @@ export default function TripMap({ location, days }) {
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {points.map((p, i) => (
-          <Marker key={i} position={[p.lat, p.lng]} />
+          <LeafletMarker key={i} position={[p.lat, p.lng]} />
         ))}
         {points.length > 1 && (
-          <Polyline
-            positions={points.map((p) => [p.lat, p.lng])}
-            color="blue"
-          />
+          <LeafletPolyline positions={points.map((p) => [p.lat, p.lng])} color="blue" />
         )}
+        {centerTarget && <LeafletAutoCenter target={centerTarget} />}
       </MapContainer>
     );
   }
 
-  // ✅ Use Google Maps if key exists
-  const { isLoaded } = useLoadScript({ googleMapsApiKey: apiKey });
   if (!isLoaded) return <div>Loading map...</div>;
+  if (loadError) return <div>Map load error</div>;
 
   return (
     <GoogleMap
       zoom={12}
       center={location}
       mapContainerClassName="w-full h-64 rounded-lg"
+      onLoad={(map) => (mapRef.current = map)}
     >
       {points.map((p, i) => (
         <Marker key={i} position={p} label={i === 0 ? "Start" : `${i}`} />

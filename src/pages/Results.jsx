@@ -1,32 +1,48 @@
 // src/pages/Results.jsx
 import React, { useState, useEffect } from "react";
-import Chat from "../widgets/Chat";
 import BookingModal from "../widgets/BookingModal";
-import { collection, addDoc, db, doc, setDoc } from "../utils/firebase";
-
+import { db, doc, setDoc } from "../utils/firebase";
 import { summarizeTrip } from "../utils/gemini";
 import AISuggestionModal from "../components/AISuggestionModal";
 import { fetchWeather, getWeather } from "../utils/weather";
 import TripMap from "../components/TripMap";
-import TripMapDirection from "../components/TripMapDirection";
 import WeatherWidget from "../components/WeatherWidget";
 import Chat2 from "../widgets/Chat2";
 import { exportTripToPDF } from "../utils/pdf";
+import ActivityActions from "../components/ActivityActions";
+import Recommendations from "../components/Recommendations";
+import { useNavigate } from "react-router-dom";
 
 export default function Results({ trip, onBack, user, onUpdateTrip }) {
   const [summary, setSummary] = useState("");
+  const [centerTarget, setCenterTarget] = useState(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState([]);
+  const [showBooking, setShowBooking] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [saved, setSaved] = useState(Boolean(trip?.id)); // true if already has id
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [weather, setWeather] = useState(null);
+  const [forecast, setForecast] = useState([]);
 
   useEffect(() => {
+    async function loadWeather() {
+      if (!trip?.location) return;
+      // Assume trip has { location: { lat, lon } }
+      const w = await getWeather(
+        trip.location.lat,
+        trip.location?.lon || trip.location.lng
+      );
+      setWeather(w);
+
+      fetchWeather(trip?.location.lat, trip?.location.lng).then(setForecast);
+    }
+    loadWeather();
     async function loadSummary() {
       const text = await summarizeTrip(trip);
       setSummary(text);
     }
     loadSummary();
   }, [trip]);
-
-  const [showBooking, setShowBooking] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [saved, setSaved] = useState(Boolean(trip?.id)); // true if already has id
 
   useEffect(() => {
     // Reset saved flag when a different trip is passed in
@@ -52,7 +68,9 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
     }
     saveItinerary();
   }, [trip, user]);
-  const [aiSuggestion, setAiSuggestion] = useState(null);
+  // useEffect(() => {
+
+  // }, [trip]);
 
   function applySuggestion(update) {
     const newTrip = { ...trip };
@@ -83,23 +101,6 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
       setDoc(ref, newTrip);
     }
   }
-  const [weather, setWeather] = useState(null);
-
-  useEffect(() => {
-    async function loadWeather() {
-      if (!trip?.location) return;
-      // Assume trip has { location: { lat, lon } }
-      const w = await getWeather(
-        trip.location.lat,
-        trip.location?.lon || trip.location.lng
-      );
-      setWeather(w);
-
-      fetchWeather(trip?.location.lat, trip?.location.lng).then(setForecast);
-    }
-    loadWeather();
-  }, [trip]);
-  const [forecast, setForecast] = useState([]);
 
   return (
     <div className="space-y-6">
@@ -205,7 +206,8 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
                         >
                           Score: {it.score}%
                         </div>
-                        <button
+
+                        {/* <button
                           onClick={() => {
                             setSelected(it);
                             setShowBooking(true);
@@ -213,8 +215,13 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
                           className="px-3 py-1 bg-blue-600 text-white rounded"
                         >
                           Book
-                        </button>
+                        </button> */}
                       </div>
+                      <ActivityActions
+                        item={it}
+                        centerLocation={trip.location}
+                        onCenterMap={(target) => setCenterTarget(target)}
+                      />
                     </div>
                   </div>
                 ))}
@@ -239,7 +246,7 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
                 setAiSuggestion(update); // 👈 open modal instead of applying
               }}
             />
-        {/* <Chat
+            {/* <Chat
               trip={trip}
               weather={forecast}
               onTripUpdate={(update) => {
@@ -263,8 +270,23 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
               Google Maps preview (add API)
             </div> */}
 
-            <TripMap location={trip.location} days={trip.days} />
+            <TripMap
+              location={trip.location}
+              days={trip.days}
+              centerTarget={centerTarget}
+            />
             {/* <TripMapDirection location={trip.location} days={trip.days} /> */}
+            {nearbyPlaces.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 shadow mt-4">
+                <h4 className="font-semibold mb-2">Nearby Attractions</h4>
+                <ul className="space-y-1 text-sm text-gray-700">
+                  {nearbyPlaces.map((p, i) => (
+                    <li key={i}>• {p.name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="mt-3 text-sm text-gray-600">
               Route & distances provided by Maps API in full integration.
             </div>
@@ -289,7 +311,14 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
           </div>
         </div>
       </div>
-
+      <Recommendations
+        location={trip.location}
+        onAddToTrip={(place) => {
+          const updatedTrip = { ...trip };
+          updatedTrip.days[0].items.push(place);
+          onUpdateTrip(updatedTrip);
+        }}
+      />
       <BookingModal
         show={showBooking}
         item={selected}
