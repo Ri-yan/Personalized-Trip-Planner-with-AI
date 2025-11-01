@@ -183,7 +183,7 @@ import Onboarding from "./pages/Onboarding";
 import Results from "./pages/Results";
 import Footer from "./components/Footer";
 import ConfirmModal from "./components/ConfirmModal";
-
+import { useDispatch, useSelector } from "react-redux";
 import {
   auth,
   onAuthStateChanged,
@@ -195,12 +195,23 @@ import {
   updateDoc,
 } from "./utils/firebase";
 import { generateTripPlan } from "./utils/tripPlanner";
+import {
+  clearUser,
+  setLoading,
+  setPastTrips,
+  setUser,
+} from "./store/slices/userSlice";
+import { generateActiveTrip, setActiveTrip } from "./store/slices/tripSlice";
 
 export default function App() {
+  const dispatch = useDispatch();
+  const { current: user, pastTrips, loading } = useSelector((s) => s.user);
+  const { activeTrip } = useSelector((s) => s.trip);
+
   const [trip, setTrip] = useState(null);
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [pastTrips, setPastTrips] = useState([]);
+  // const [user, setUser] = useState(null);
+  // const [loading, setLoading] = useState(true);
+  // const [pastTrips, setPastTrips] = useState([]);
   const [tripToDelete, setTripToDelete] = useState(null);
 
   const navigate = useNavigate();
@@ -216,7 +227,8 @@ export default function App() {
           email: firebaseUser.email,
           uid: firebaseUser.uid,
         };
-        setUser(userObj);
+        dispatch(setUser(userObj));
+        //setUser(userObj);
 
         // realtime trip sync
         const tripsRef = collection(db, "users", userObj.uid, "itineraries");
@@ -228,14 +240,17 @@ export default function App() {
             }
             return (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0);
           });
-          setPastTrips(trips);
+          dispatch(setPastTrips(trips));
+          //setPastTrips(trips);
         });
       } else {
-        setUser(null);
-        setPastTrips([]);
+        // setUser(null);
+        // setPastTrips([]);
+        dispatch(clearUser());
         if (unsubscribeTrips) unsubscribeTrips();
       }
-      setLoading(false);
+      dispatch(setLoading(false));
+      //setLoading(false);
     });
 
     return () => {
@@ -268,7 +283,32 @@ export default function App() {
       console.error("❌ Error toggling favorite:", err);
     }
   }
+  useEffect(() => {
+    async function updateItinerary() {
+      if (!user || !trip) return;
 
+      try {
+        const ref = doc(db, "users", user.uid, "itineraries", trip.id);
+
+        // 🔹 Use updateDoc (only updates changed fields)
+        await updateDoc(ref, {
+          ...trip,
+        });
+
+        console.log("🆙 Trip updated:", trip.id);
+      } catch (err) {
+        // 🔸 Handle case if document doesn't exist
+        if (err.code === "not-found") {
+          console.warn("Trip not found in Firestore, creating new...");
+          await setDoc(ref, { ...trip, unsaved: false });
+        } else {
+          console.error("❌ Error updating itinerary:", err);
+        }
+      }
+    }
+
+    updateItinerary();
+  }, [trip, user]);
   // 🔹 Loading screen
   if (loading) {
     return (
@@ -290,18 +330,20 @@ export default function App() {
             element={
               <>
                 <Onboarding
-                  onGenerate={(tripData) => {
-                    debugger
-                    generateTripPlan(tripData,user, navigate);
-                    //navigate("/results", { state: { trip: tripData } });
-                  }}
+                  // onGenerate={(tripData) => {
+                  //   generateTripPlan(tripData,user, navigate);
+                  //   //navigate("/results", { state: { trip: tripData } });
+                  // }}
+                  onGenerate={(trip) =>
+                    dispatch(generateActiveTrip({ trip, user, navigate }))
+                  }
                   user={user}
                   pastTrips={pastTrips}
                   toggleFavorite={toggleFavorite}
                   setTripToDelete={setTripToDelete}
                 />
                 {/* Saved Trips List */}
-                {user && pastTrips.length > 0 && (
+                {/* {user && pastTrips.length > 0 && (
                   <div className="mb-6">
                     <h2 className="text-xl font-semibold mb-3">
                       Your Saved Trips
@@ -331,7 +373,11 @@ export default function App() {
                           <div className="mt-2 flex gap-2">
                             <button
                               onClick={() =>
-                                navigate("/results", { state: { trip: t } })
+                               {
+                                debugger;
+                                let data = {userId: user?.uid || "guest", tripId: t.uid};
+                                const eqs = crypto.encryptForUrl(JSON.stringify(data))
+                                navigate(`/results/${eqs}`, { state: { trip: t } })}
                               }
                               className="px-3 py-1 bg-blue-600 text-white rounded"
                             >
@@ -348,20 +394,22 @@ export default function App() {
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
               </>
             }
           />
 
           {/* 📍 Results Page */}
           <Route
-            path="/results"
+            path="/results/:id"
             element={
               <Results
                 trip={location.state?.trip}
                 onBack={() => navigate("/")}
                 user={user}
-                onUpdateTrip={(updatedTrip) => setTrip(updatedTrip)}
+                onUpdateTrip={(updatedTrip) => {
+                  setTrip(updatedTrip);
+                }}
               />
             }
           />

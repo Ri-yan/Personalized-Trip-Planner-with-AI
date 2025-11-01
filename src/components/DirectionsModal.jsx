@@ -32,14 +32,44 @@ export default function DirectionsModal({ show, onClose, destination }) {
         </div>
 
         <div className="flex justify-end gap-2">
-          <button
+          <PopupExample directionsUrl={directionsUrl} />
+          {/* <button
             onClick={() => window.open(directionsUrl, "_blank")}
             className="bg-blue-600 text-white px-4 py-2 rounded text-sm"
           >
             Open Directions in Google Maps
-          </button>
+          </button> */}
         </div>
       </div>
     </div>
+  );
+}
+function PopupExample({ directionsUrl }) {
+  const openPopup = () => {
+    const width = 900;
+    const height = 500;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const popup = window.open(
+      directionsUrl,
+      "popupWindow",
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no`
+    );
+
+    if (popup) {
+      popup.focus();
+    } else {
+      alert("Please allow popups for this site.");
+    }
+  };
+
+  return (
+    <button
+      onClick={openPopup}
+      className="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+    >
+      Open Directions in Google Maps
+    </button>
   );
 }

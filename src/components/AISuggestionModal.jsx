@@ -40,6 +40,7 @@ export default function AISuggestionModal({
         <h3 className="text-lg font-semibold mb-3">AI Suggestion</h3>
 
         {suggestion.action !== "none" ? (
+          <div className="scrollable-container" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
               The AI suggests to <b>{suggestion.action}</b> items on Day{" "}
@@ -101,7 +102,7 @@ export default function AISuggestionModal({
             >
               + Add Activity
             </button>
-          </div>
+          </div></div>
         ) : (
           <p className="text-gray-600">No actionable updates suggested.</p>
         )}

@@ -1,8 +1,9 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import crypto from "../helper/crypto";
 
-function SavedTrips({user, pastTrips, toggleFavorite, setTripToDelete}) {
-    const navigate = useNavigate();
+function SavedTrips({ user, pastTrips, toggleFavorite, setTripToDelete }) {
+  const navigate = useNavigate();
 
   return (
     <>
@@ -31,7 +32,15 @@ function SavedTrips({user, pastTrips, toggleFavorite, setTripToDelete}) {
                 </div>
                 <div className="mt-2 flex gap-2">
                   <button
-                    onClick={() => navigate("/results", { state: { trip: t } })}
+                    onClick={() => {
+                      const eqs = crypto.encryptForUrl(
+                        {
+                          userId: user?.uid || "guest",
+                          tripId: t.id,
+                        }
+                      );
+                      navigate(`/results/${eqs}`, { state: { trip: t } });
+                    }}
                     className="px-3 py-1 bg-blue-600 text-white rounded"
                   >
                     View

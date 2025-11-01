@@ -6,14 +6,21 @@ import { sampleTrip } from "../data/sampleTrip";
 import { useNavigate } from "react-router-dom";
 import SavedTrips from "../components/SavedTrips";
 import { generateTripPlan } from "../utils/tripPlanner";
+import crypto from "../helper/crypto";
 
-export default function Onboarding({ onGenerate, user,pastTrips,toggleFavorite, setTripToDelete }) {
+export default function Onboarding({
+  onGenerate,
+  user,
+  pastTrips,
+  toggleFavorite,
+  setTripToDelete,
+}) {
   const [destination, setDestination] = useState("Jaipur");
   const [days, setDays] = useState(3);
   const [budget, setBudget] = useState(12000);
   const [persona, setPersona] = useState("Heritage Lover");
   const [loading, setLoading] = useState(false);
-  const [interests, setInterests] = useState([])
+  const [interests, setInterests] = useState([]);
 
   const navigate = useNavigate();
 
@@ -29,8 +36,9 @@ export default function Onboarding({ onGenerate, user,pastTrips,toggleFavorite, 
       unsaved: true,
       location,
       title: destination,
-      costEstimate: budget,
-      interests:interests,
+      costEstimate: 0,
+      budget: budget,
+      interests: interests,
       days: Array.from({ length: days }, (_, i) => ({
         day: i + 1,
         items: [],
@@ -50,7 +58,8 @@ export default function Onboarding({ onGenerate, user,pastTrips,toggleFavorite, 
             Plan your perfect trip
           </h2>
           <p className="text-gray-500 mb-4">
-            Tell us a few details and we’ll craft a personalized itinerary powered by AI.
+            Tell us a few details and we’ll craft a personalized itinerary
+            powered by AI.
           </p>
 
           {/* Form */}
@@ -74,7 +83,9 @@ export default function Onboarding({ onGenerate, user,pastTrips,toggleFavorite, 
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-600">Budget (INR)</label>
+              <label className="block text-sm text-gray-600">
+                Budget (INR)
+              </label>
               <input
                 type="number"
                 className="mt-1 w-full border rounded p-2"
@@ -100,7 +111,6 @@ export default function Onboarding({ onGenerate, user,pastTrips,toggleFavorite, 
           <div className="mt-4">
             <label className="block text-sm text-gray-600">Interests</label>
             <Interests onChange={(vals) => setInterests(vals)} />
-
           </div>
 
           <div className="mt-6 flex items-center gap-4">
@@ -117,33 +127,46 @@ export default function Onboarding({ onGenerate, user,pastTrips,toggleFavorite, 
 
       {/* RIGHT: TOP PICKS */}
       <div className="col-span-5">
-        <SavedTrips user={user} pastTrips={pastTrips} toggleFavorite={toggleFavorite} setTripToDelete={setTripToDelete} />
+        <SavedTrips
+          user={user}
+          pastTrips={pastTrips}
+          toggleFavorite={toggleFavorite}
+          setTripToDelete={setTripToDelete}
+        />
         <div className="bg-gradient-to-br from-blue-50 to-white rounded-2xl p-4 shadow">
-          <h3 className="font-semibold mb-3">🌆 Preview: Top Picks in Jaipur</h3>
+          <h3 className="font-semibold mb-3">
+            🌆 Preview: Top Picks in Jaipur
+          </h3>
           <div className="space-y-3">
-            {sampleTrip.days.flatMap((d) => d.items).map((p, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition flex items-start gap-3"
-              >
-                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-700 font-semibold">
-                  {p.title.charAt(0)}
-                </div>
-                <div>
-                  <div className="font-medium">{p.title}</div>
-                  <div className="text-sm text-gray-500">
-                    {p.category} • Best: {p.bestTime}
+            {sampleTrip.days
+              .flatMap((d) => d.items)
+              .map((p, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition flex items-start gap-3"
+                >
+                  <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-700 font-semibold">
+                    {p.title.charAt(0)}
                   </div>
-                  <div className="text-xs text-green-600 mt-1">
-                    Score: {p.score}%
+                  <div>
+                    <div className="font-medium">{p.title}</div>
+                    <div className="text-sm text-gray-500">
+                      {p.category} • Best: {p.bestTime}
+                    </div>
+                    <div className="text-xs text-green-600 mt-1">
+                      Score: {p.score}%
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
 
           <button
-            onClick={() => navigate("/results", { state: { trip: sampleTrip } })}
+            onClick={() => {
+              let data = { userId: user?.uid || "guest", tripId: null };
+              const eqs = crypto.encryptForUrl(data);
+              navigate(`/results/${eqs}`);
+            }}
             className="mt-4 w-full px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700"
           >
             View This Trip
@@ -153,7 +176,8 @@ export default function Onboarding({ onGenerate, user,pastTrips,toggleFavorite, 
         <div className="mt-4 bg-white rounded-2xl p-4 shadow">
           <h4 className="font-semibold mb-2">💡 Quick Tip</h4>
           <div className="text-sm text-gray-600">
-            Try selecting <b>“Foodie Explorer”</b> or <b>“Adventure Seeker”</b> for unique itineraries.
+            Try selecting <b>“Foodie Explorer”</b> or <b>“Adventure Seeker”</b>{" "}
+            for unique itineraries.
           </div>
         </div>
       </div>

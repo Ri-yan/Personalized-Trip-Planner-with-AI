@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react";
 import { fetchNearbyPlaces } from "../utils/places";
 import { Star } from "lucide-react"; // optional icon from lucide-react
 
-export default function Recommendations({ location, onAddToTrip }) {
+export default function Recommendations({ location, onAddToTrip, trip }) {
   const [hotels, setHotels] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
-
+  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [showDaySelect, setShowDaySelect] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(1);
+  const [selectedTime, setSelectedTime] = useState("morning");
   async function loadRecommendations() {
     setLoading(true);
     const lat = location?.lat;
@@ -42,7 +45,12 @@ export default function Recommendations({ location, onAddToTrip }) {
               key={i}
               className="border rounded-xl p-3 bg-white hover:shadow-md transition"
             >
-                {p.photoUrl && <img src={p.photoUrl} className="w-full h-24 object-cover rounded mb-2" />}
+              {p.photoUrl && (
+                <img
+                  src={p.photoUrl}
+                  className="w-full h-24 object-cover rounded mb-2"
+                />
+              )}
 
               <div className="flex justify-between items-start mb-2">
                 <h6 className="font-medium text-sm text-gray-800 line-clamp-2">
@@ -66,8 +74,8 @@ export default function Recommendations({ location, onAddToTrip }) {
                 </span>
                 <button
                   className="text-indigo-600 text-xs font-medium hover:underline"
-                  onClick={() =>
-                    onAddToTrip({
+                  onClick={() => {
+                    setSelectedPlace({
                       time,
                       title: p.name,
                       category,
@@ -75,8 +83,9 @@ export default function Recommendations({ location, onAddToTrip }) {
                       score: Math.round(p.rating * 20) || 70,
                       lat: p.lat,
                       lng: p.lng,
-                    })
-                  }
+                    });
+                    setShowDaySelect(true);
+                  }}
                 >
                   ➕ Add
                 </button>
@@ -103,23 +112,81 @@ export default function Recommendations({ location, onAddToTrip }) {
         </button>
       </div>
 
-      {loading && (
-        <div className="text-center py-6 text-gray-500 animate-pulse">
-          Fetching nearby places...
+      <div
+        className="scrollable-container"
+        style={{ maxHeight: "60vh", overflowY: "auto" }}
+      >
+        {loading && (
+          <div className="text-center py-6 text-gray-500 animate-pulse">
+            Fetching nearby places...
+          </div>
+        )}
+
+        {!loading && (
+          <>
+            {renderCards(hotels, "Hotel", "Evening", "Anytime")}
+            {renderCards(restaurants, "Restaurant", "Lunch", "Afternoon")}
+          </>
+        )}
+
+        {!loading && !hotels.length && !restaurants.length && (
+          <p className="text-gray-500 text-sm italic text-center">
+            No nearby places found. Try again later.
+          </p>
+        )}
+      </div>
+      {showDaySelect && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-4 w-80 shadow-lg">
+            <h4 className="font-semibold mb-2 text-center">
+              Add to which day?
+            </h4>
+            <select
+              value={selectedDay}
+              onChange={(e) => setSelectedDay(Number(e.target.value))}
+              className="w-full border p-2 rounded mb-3"
+            >
+              {Array.from({ length: trip.days.length }).map((_, i) => (
+                <option key={i} value={i + 1}>
+                  Day {i + 1}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedTime}
+              onChange={(e) => setSelectedTime(e.target.value)}
+              className="w-full border p-2 rounded mb-3"
+            >
+              <option key={"morning"} value={"morning"}>
+                morning
+              </option>
+              <option key={"afternoon"} value={"afternoon"}>
+                afternoon
+              </option>
+              <option key={"evening"} value={"evening"}>
+                evening
+              </option>
+            </select>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDaySelect(false)}
+                className="px-3 py-1 border rounded text-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onAddToTrip(selectedPlace, selectedDay, selectedTime);
+                  setShowDaySelect(false);
+                }}
+                className="px-3 py-1 bg-indigo-600 text-white rounded"
+              >
+                Add
+              </button>
+            </div>
+          </div>
         </div>
-      )}
-
-      {!loading && (
-        <>
-          {renderCards(hotels, "Hotel", "Evening", "Anytime")}
-          {renderCards(restaurants, "Restaurant", "Lunch", "Afternoon")}
-        </>
-      )}
-
-      {!loading && !hotels.length && !restaurants.length && (
-        <p className="text-gray-500 text-sm italic text-center">
-          No nearby places found. Try again later.
-        </p>
       )}
     </div>
   );

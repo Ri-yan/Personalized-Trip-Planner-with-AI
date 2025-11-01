@@ -1,8 +1,12 @@
 // src/pages/Results.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import BookingModal from "../widgets/BookingModal";
-import { db, doc, setDoc } from "../utils/firebase";
-import { summarizeTrip } from "../utils/gemini";
+import { db, doc, onSnapshot, setDoc, updateDoc } from "../utils/firebase";
+import {
+  refineTripWithGemini,
+  summarizeTrip,
+  summarizeWeather,
+} from "../utils/gemini";
 import AISuggestionModal from "../components/AISuggestionModal";
 import { fetchWeather, getWeather } from "../utils/weather";
 import TripMap from "../components/TripMap";
@@ -11,19 +15,96 @@ import Chat2 from "../widgets/Chat2";
 import { exportTripToPDF } from "../utils/pdf";
 import ActivityActions from "../components/ActivityActions";
 import Recommendations from "../components/Recommendations";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import TripInsightsPanel from "../components/TripInsightPanel";
+import TripTimeline from "../components/TripTimeline";
+import { Map, MapPin, SparkleIcon, Sparkles } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import crypto from "../helper/crypto";
+import { useDispatch, useSelector } from "react-redux";
+import { setActiveTrip } from "../store/slices/tripSlice";
+import ConfirmModal from "../components/ConfirmModal";
+import { ShareButton } from "../components/ShareModal";
 
-export default function Results({ trip, onBack, user, onUpdateTrip }) {
+export default function Results({ onBack, user, onUpdateTrip }) {
   const [summary, setSummary] = useState("");
   const [centerTarget, setCenterTarget] = useState(null);
   const [nearbyPlaces, setNearbyPlaces] = useState([]);
   const [showBooking, setShowBooking] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [saved, setSaved] = useState(Boolean(trip?.id)); // true if already has id
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [weather, setWeather] = useState(null);
   const [forecast, setForecast] = useState([]);
+  const activeTrip = useSelector((s) => s.trip.activeTrip);
+  const [trip, setTrip] = useState(activeTrip);
 
+  const param = useParams();
+  const dispatch = useDispatch();
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const unsubscribeRef = useRef(null); // 🔹 persist unsubscribe
+
+  useEffect(() => {
+    if (!param?.id) {
+      setError("Invalid or missing trip ID in URL");
+      return;
+    }
+
+    // ✅ Cleanup any previous listener
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+
+    try {
+      const data = crypto.decryptFromUrl(param.id);
+      const { userId, tripId } = data;
+
+      if (!userId || !tripId) {
+        setError("Decryption failed or missing IDs");
+        return;
+      }
+
+      const tripRef = doc(db, "users", userId, "itineraries", tripId);
+
+      const unsubscribe = onSnapshot(
+        tripRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const tripData = { id: tripId, ...snapshot.data() };
+            dispatch(setActiveTrip(tripData));
+            setTrip(structuredClone(tripData)); // update Redux once per change
+            setLoading(false);
+          } else {
+            setError("Trip not found or deleted");
+            setLoading(false);
+          }
+        },
+        (err) => {
+          console.error("❌ Firestore listener error:", err);
+          setError("Failed to load trip data.");
+          setLoading(false);
+        }
+      );
+
+      // 🔹 Keep reference for cleanup
+      unsubscribeRef.current = unsubscribe;
+    } catch (e) {
+      console.error("❌ Decryption or Firestore error:", e);
+      setError("Unable to access this trip.");
+      setLoading(false);
+    }
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+        dispatch(setActiveTrip(null));
+        setTrip(null);
+      }
+    };
+  }, [param?.id]);
+  const [saved, setSaved] = useState(Boolean(trip?.id)); // true if already has id
   useEffect(() => {
     async function loadWeather() {
       if (!trip?.location) return;
@@ -49,31 +130,8 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
     setSaved(Boolean(trip?.id));
   }, [trip?.id]);
 
-  useEffect(() => {
-    async function saveItinerary() {
-      if (!user || !trip || !trip.unsaved) return;
-
-      try {
-        const ref = doc(db, "users", user.uid, "itineraries", trip.id);
-        await setDoc(ref, {
-          ...trip,
-          unsaved: false,
-        });
-
-        console.log("✅ Trip saved with ID:", trip.id);
-        onUpdateTrip({ ...trip, unsaved: false });
-      } catch (err) {
-        console.error("❌ Error saving itinerary:", err);
-      }
-    }
-    saveItinerary();
-  }, [trip, user]);
-  // useEffect(() => {
-
-  // }, [trip]);
-
   function applySuggestion(update) {
-    const newTrip = { ...trip };
+    const newTrip = structuredClone(trip);
 
     if (update.action === "add") {
       const dayIdx = newTrip.days.findIndex((d) => d.day === update.day);
@@ -102,33 +160,28 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
     }
   }
 
+  if (loading) {
+    return <div>Loading trip...</div>;
+  }
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{trip.title}</h2>
           <div className="text-sm text-gray-500">
-            {trip.days.length} days • Est. ₹{trip.costEstimate}
+            {trip.days.length} days • Budget. ₹{trip.budget} • Est. ₹{trip.costEstimate}
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={onBack} className="px-3 py-2 border rounded">
             Back
           </button>
-          <button
-            onClick={() =>
-              navigator.share
-                ? navigator.share({
-                    title: trip.title,
-                    text: "Check my trip",
-                    url: location.href,
-                  })
-                : alert("Share your trip link (demo)")
-            }
-            className="px-3 py-2 bg-indigo-600 text-white rounded"
-          >
-            Share
-          </button>
+          <ShareButton
+            trip={trip}
+            createShareUrl={(trip) => {
+              return `${window.location.origin}/results/${param.id}`;
+            }}
+          />
         </div>
       </div>
       {summary && (
@@ -139,75 +192,76 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
           <p className="text-yellow-700 text-sm">{summary}</p>
         </div>
       )}
-
-      {weather && (
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded mb-4">
-          <h3 className="font-semibold text-blue-800 mb-1">
-            🌤️ Weather Updates
-          </h3>
-          <p className="text-blue-700 text-sm">
-            {weather.list[0]?.weather[0]?.description},{" "}
-            {weather.list[0]?.main?.temp}°C
-          </p>
-          <button
-            onClick={() =>
-              setAiSuggestion({
-                action: "update",
-                day: 1,
-                items: [
-                  {
-                    time: "Morning",
-                    title: "Indoor Museum Visit",
-                    category: "Culture",
-                    bestTime: "Anytime",
-                    score: 90,
-                  },
-                ],
-              })
-            }
-            className="mt-2 px-3 py-1 bg-indigo-600 text-white rounded"
-          >
-            Adjust Plan Based on Weather
-          </button>
-        </div>
-      )}
-
       <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-8 space-y-4">
-          {trip.days.map((d) => (
-            <div key={d.day} className="bg-white rounded-2xl shadow p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Day {d.day}</h3>
-                <div className="text-sm text-gray-500">
-                  Morning • Afternoon • Evening
+        <div className="col-span-8 space-y-4 ">
+          <div
+            className="rounded-2xl shadow-md  space-y-6 scrollable-container "
+            style={{ maxHeight: "80vh", overflowY: "auto" }}
+          >
+            {trip.days.map((d) => (
+              <div key={d.day} className="bg-white rounded-2xl shadow p-2 mb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold">Day {d.day}</h3>
+                  <div className="text-sm text-gray-500">
+                    Morning • Afternoon • Evening
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {d.items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 border rounded-lg flex items-start gap-3"
-                  >
-                    <div className="w-16 text-sm text-gray-500">{it.time}</div>
-                    <div className="flex-1">
-                      <div className="font-medium">{it.title}</div>
-                      <div className="text-sm text-gray-500">
-                        {it.category} • Best: {it.bestTime}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {d.items.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="relative p-3 border rounded-lg flex items-start gap-3 group hover:shadow-md transition"
+                    >
+                      <button
+                        onClick={() => {
+                          const updatedTrip = structuredClone(trip);
+                          const dayIndex = updatedTrip.days.findIndex(
+                            (day) => day.day === d.day
+                          );
+                          updatedTrip.days[dayIndex].items = updatedTrip.days[
+                            dayIndex
+                          ].items.filter((_, i) => i !== idx);
+                          onUpdateTrip(updatedTrip);
+                        }}
+                        className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
+                        title="Remove activity"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <div className="w-16 text-sm text-gray-500">
+                        {it.time}
                       </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div
-                          className={
-                            "px-2 py-1 rounded text-sm " +
-                            (it.score > 80
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700")
-                          }
-                        >
-                          Score: {it.score}%
+                      <div className="flex-1">
+                        <div className="font-medium">{it.title}</div>
+                        <div className="text-sm text-gray-500">
+                          {it.category} • Best: {it.bestTime}
                         </div>
-
-                        {/* <button
+                        <div className="mt-2 flex items-center gap-2">
+                          <div
+                            className={
+                              "px-2 py-1 rounded text-sm " +
+                              (it.score > 80
+                                ? "bg-green-100 text-green-700"
+                                : "bg-yellow-100 text-yellow-700")
+                            }
+                          >
+                            Score: {it.score}%
+                          </div>
+                          {it.category === "Hotel" ? (
+                            <button
+                              onClick={() => {
+                                setSelected(it);
+                                setShowBooking(true);
+                              }}
+                              className="px-3 py-1 bg-blue-600 text-white rounded"
+                            >
+                              Book
+                            </button>
+                          ) : (
+                            ""
+                          )}
+                          {/* <button
                           onClick={() => {
                             setSelected(it);
                             setShowBooking(true);
@@ -216,37 +270,70 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
                         >
                           Book
                         </button> */}
+                        </div>
+                        <ActivityActions
+                          item={it}
+                          centerLocation={trip.location}
+                          onCenterMap={(target) => setCenterTarget(target)}
+                        />
                       </div>
-                      <ActivityActions
-                        item={it}
-                        centerLocation={trip.location}
-                        onCenterMap={(target) => setCenterTarget(target)}
-                      />
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
           <div className="col-span-8 space-y-4">
-            <div className="bg-white rounded-2xl p-4 shadow">
-              <WeatherWidget location={trip.location} />
-            </div>
+            <WeatherWidget location={trip.location} />
+            {weather && (
+              <button
+                onClick={async () => {
+                  const weatherSummary = summarizeWeather(weather);
+
+                  // Ask Gemini how to adjust itinerary given weather
+                  const aiUpdate = await refineTripWithGemini(
+                    {
+                      ...trip,
+                      nearby: trip?.nearby, // contains hotels/restaurants/monuments
+                    },
+                    `Adjust this itinerary for weather: ${weatherSummary}. Prefer indoor attractions or restaurants if it's raining.`
+                  );
+
+                  if (aiUpdate.action === "none") {
+                    alert("No weather-based updates suggested.");
+                    return;
+                  }
+
+                  // Show the suggestion modal (editable)
+                  setAiSuggestion(aiUpdate);
+                }}
+                className="mt-2 px-3 py-1 bg-indigo-600 text-white rounded"
+              >
+                Adjust Plan Based on Weather
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="col-span-4 space-y-4">
-          <div className="bg-white rounded-2xl p-4 shadow">
-            <h4 className="font-semibold mb-2">Personalized Assistant</h4>
-            <Chat2
-              trip={trip}
-              weather={forecast}
-              onTripUpdate={(update) => {
-                if (!update || update.action === "none") return;
-                setAiSuggestion(update); // 👈 open modal instead of applying
-              }}
-            />
-            {/* <Chat
+        <div className="col-span-4 space-y-4  rounded-2xl  py-4">
+          <h4 className="font-semibold mb-2">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center mx-2">
+                <Sparkles className="w-5 h-5 text-white " />
+              </div>{" "}
+              AI Trip Assistant
+            </div>
+          </h4>
+          <Chat2
+            trip={trip}
+            weather={forecast}
+            onTripUpdate={(update) => {
+              if (!update || update.action === "none") return;
+              setAiSuggestion(update); // 👈 open modal instead of applying
+            }}
+          />
+          {/* <Chat
               trip={trip}
               weather={forecast}
               onTripUpdate={(update) => {
@@ -254,22 +341,24 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
                 setAiSuggestion(update); // 👈 open modal instead of applying
               }}
             /> */}
-            <AISuggestionModal
-              show={!!aiSuggestion}
-              suggestion={aiSuggestion}
-              onReject={() => setAiSuggestion(null)}
-              onAccept={(editedSuggestion) => {
-                applySuggestion(editedSuggestion); // apply only when user accepts
-                setAiSuggestion(null);
-              }}
-            />
-          </div>
+          <AISuggestionModal
+            show={!!aiSuggestion}
+            suggestion={aiSuggestion}
+            onReject={() => setAiSuggestion(null)}
+            onAccept={(editedSuggestion) => {
+              applySuggestion(editedSuggestion); // apply only when user accepts
+              setAiSuggestion(null);
+            }}
+          />
           <div className="bg-white rounded-2xl p-4 shadow">
-            <h4 className="font-semibold mb-2">Map Preview</h4>
-            {/* <div className="h-64 rounded bg-gray-100 flex items-center justify-center">
-              Google Maps preview (add API)
-            </div> */}
-
+            <h4 className="font-semibold mb-2">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center mx-2">
+                  <MapPin className="w-5 h-5 text-white inline-block" />
+                </div>
+                Map Preview
+              </div>
+            </h4>
             <TripMap
               location={trip.location}
               days={trip.days}
@@ -312,13 +401,26 @@ export default function Results({ trip, onBack, user, onUpdateTrip }) {
         </div>
       </div>
       <Recommendations
+        trip={trip}
         location={trip.location}
-        onAddToTrip={(place) => {
-          const updatedTrip = { ...trip };
-          updatedTrip.days[0].items.push(place);
+        onAddToTrip={(place, dayNumber, time) => {
+          const updatedTrip = structuredClone(trip);
+
+          const dayIndex = updatedTrip.days.findIndex(
+            (d) => d.day === dayNumber
+          );
+          if (place) place.time = time;
+
+          if (dayIndex >= 0) {
+            updatedTrip.days[dayIndex].items.push(place);
+          } else {
+            updatedTrip.days.push({ day: dayNumber, items: [place] });
+          }
+
           onUpdateTrip(updatedTrip);
         }}
       />
+      <TripInsightsPanel trip={trip} />
       <BookingModal
         show={showBooking}
         item={selected}

@@ -1,10 +1,11 @@
 // src/utils/tripPlanner.js
 import { fetchWeather } from "./weather";
 import { fetchNearbyPlaces } from "./places";
-import { aiPlannerAgent, askGemini } from "./gemini";
+import { aiPlannerAgent, askGemini, summarizeWeather } from "./gemini";
 import { fetchLatLng } from "./geodecoding";
 import { db, doc, setDoc } from "./firebase";
 import { v4 as uuidv4 } from "uuid";
+import crypto from "../helper/crypto";
 
 /**
  * Generate a complete AI-powered trip plan
@@ -53,7 +54,7 @@ export async function generateTripPlan(formData, user, navigate) {
 
     // 2️⃣ Get weather data
     const weather = await fetchWeather(coords.lat, coords.lng);
-
+    const weatherSummary = summarizeWeather(weather);
     // 3️⃣ Fetch nearby points (Google + Overpass fallback)
     const [hotels, restaurants, monuments] = await Promise.all([
       fetchNearbyPlaces({ lat: coords.lat, lng: coords.lng, type: "lodging" }),
@@ -68,13 +69,13 @@ export async function generateTripPlan(formData, user, navigate) {
         type: "tourist_attraction",
       }),
     ]);
-
     // 4️⃣ Construct a data bundle for AI context
     const context = {
       destination: formData.title,
       days: formData.days,
-      budget: formData.costEstimate,
+      budget: formData.budget,
       persona: formData.persona,
+      interests: formData.interests,
       nearby: {
         hotels: (hotels || []).slice(0, 10),
         restaurants: (restaurants || []).slice(0, 10),
@@ -107,7 +108,8 @@ export async function generateTripPlan(formData, user, navigate) {
       {
         "title": "<destination> Getaway",
         "location": { "name": "<destination>", "lat": <lat>, "lng": <lng> },
-        "costEstimate": <budget>,
+        "costEstimate": "<costEstimate>",
+        "budget": <budget>,
         "days": [
           {
             "day": 1,
@@ -129,11 +131,13 @@ export async function generateTripPlan(formData, user, navigate) {
       Rules:
       - Use 2–3 activities per day.
       - Pick real nearby places (use provided hotels, restaurants, monuments).
-      - Align activities with persona (${formData.persona}).
+      - Align activities with persona (${formData.persona}) and Interests {${formData.interests.join(", ")}}}.
+      - Keep total cost within budget (${formData.budget}).
+      - Calculate the costEstimate.
       - If weather suggests rain, include indoor places (like museums or cafes).
+      - Include more indoor or sheltered activities on bad-weather days.
       - Return ONLY JSON, no explanations.
     `;
-    debugger;
     let res = await askGemini(prompt);
     const aiResponse = formatResult(res);
 
@@ -148,7 +152,7 @@ export async function generateTripPlan(formData, user, navigate) {
       itinerary = {
         title: `${formData.title} Trip`,
         location: coords,
-        costEstimate: formData.costEstimate,
+        budget: formData.budget,
         days: [
           {
             day: 1,
@@ -183,7 +187,7 @@ export async function generateTripPlan(formData, user, navigate) {
       id: tripId,
       title: itinerary.title || `${formData.title} Trip`,
       location: itinerary.location || coords,
-      costEstimate: formData.costEstimate,
+      budget: formData.budget,
       days: itinerary.days || [],
       weather,
       nearby: { hotels, restaurants, monuments },
@@ -197,9 +201,9 @@ export async function generateTripPlan(formData, user, navigate) {
       await setDoc(ref, tripData);
       console.log("✅ Trip saved to Firestore:", tripId);
     }
-
-    // 8️⃣ Navigate to results
-    navigate("/results", { state: { trip: tripData } });
+    let data = {userId: user?.uid || "guest", tripId: tripId};
+    const eqs = crypto.encryptForUrl(data)
+    navigate(`/results/${eqs}`, { state: { trip: tripData } });
   } catch (error) {
     console.error("❌ Trip generation failed:", error);
     alert("Something went wrong while planning your trip. Please try again.");

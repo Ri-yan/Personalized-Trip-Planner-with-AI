@@ -2,6 +2,7 @@ export const sampleTrip = {
     title: "Jaipur Heritage Getaway",
     location: { name: "Jaipur, Rajasthan", lat: 26.9124, lng: 75.7873 },
     costEstimate: 18000,
+    budget: 18000,
     days: [
       {
         day: 1,
