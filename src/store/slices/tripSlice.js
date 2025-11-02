@@ -3,9 +3,9 @@ import { generateTripPlan } from "../../utils/tripPlanner";
 
 export const generateActiveTrip = createAsyncThunk(
   "trip/generateActiveTrip",
-  async ({ trip, user, navigate }, { dispatch }) => {
+  async ({ trip, user, navigate,callback=null }, { dispatch }) => {
     // Call your trip generation logic
-    generateTripPlan(trip, user, navigate);
+    generateTripPlan(trip, user, navigate,callback);
 
     // Return trip so it updates the store
     return trip;

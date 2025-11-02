@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   CalendarDays,
-  LucideParkingMeter,
   ParkingMeter,
   RefreshCw,
   TrendingUp,
@@ -23,7 +22,7 @@ import { askGemini } from "../utils/gemini";
 
 const COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#3B82F6"];
 
-export default function TripInsightsPanel({ trip }) {
+export default function TripInsightsPanel({ trip,setTripInsights }) {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showActual, setShowActual] = useState(false);
@@ -48,6 +47,7 @@ export default function TripInsightsPanel({ trip }) {
       const match = aiRes.match(/\{[\s\S]*\}/);
       const json = match ? JSON.parse(match[0]) : {};
       setInsights(json);
+      setTripInsights(json);
     } catch (err) {
       console.error("❌ Insight generation failed:", err);
     } finally {

@@ -1,12 +1,13 @@
 // src/pages/Results.jsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import BookingModal from "../widgets/BookingModal";
-import { db, doc, onSnapshot, setDoc, updateDoc } from "../utils/firebase";
+import { db, doc, onSnapshot, setDoc } from "../utils/firebase";
 import {
   refineTripWithGemini,
   summarizeTrip,
   summarizeWeather,
 } from "../utils/gemini";
+import Swal from "sweetalert2";
 import AISuggestionModal from "../components/AISuggestionModal";
 import { fetchWeather, getWeather } from "../utils/weather";
 import TripMap from "../components/TripMap";
@@ -15,16 +16,15 @@ import Chat2 from "../widgets/Chat2";
 import { exportTripToPDF } from "../utils/pdf";
 import ActivityActions from "../components/ActivityActions";
 import Recommendations from "../components/Recommendations";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import TripInsightsPanel from "../components/TripInsightPanel";
-import TripTimeline from "../components/TripTimeline";
-import { Map, MapPin, SparkleIcon, Sparkles } from "lucide-react";
+import { MapPin, Sparkles } from "lucide-react";
 import { Trash2 } from "lucide-react";
 import crypto from "../helper/crypto";
 import { useDispatch, useSelector } from "react-redux";
 import { setActiveTrip } from "../store/slices/tripSlice";
-import ConfirmModal from "../components/ConfirmModal";
 import { ShareButton } from "../components/ShareModal";
+import { sampleTrip } from "../data/sampleTrip";
 
 export default function Results({ onBack, user, onUpdateTrip }) {
   const [summary, setSummary] = useState("");
@@ -35,8 +35,12 @@ export default function Results({ onBack, user, onUpdateTrip }) {
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [weather, setWeather] = useState(null);
   const [forecast, setForecast] = useState([]);
-  const activeTrip = useSelector((s) => s.trip.activeTrip);
-  const [trip, setTrip] = useState(activeTrip);
+
+  const [tripSummary, setTripSummary] = useState("");
+  const [weatherSummary, setTripWeatherSummary] = useState("");
+  const [tripInsights, setTripInsights] = useState({});
+  let trip = useSelector((s) => s.trip.activeTrip);
+  //const [trip, setTrip] = useState(activeTrip);
 
   const param = useParams();
   const dispatch = useDispatch();
@@ -59,7 +63,13 @@ export default function Results({ onBack, user, onUpdateTrip }) {
     try {
       const data = crypto.decryptFromUrl(param.id);
       const { userId, tripId } = data;
-
+      if (userId === "guest") {
+        onUpdateTrip(sampleTrip);
+        // setTrip(structuredClone(ac
+        dispatch(setActiveTrip(sampleTrip));
+        setLoading(false);
+        return;
+      }
       if (!userId || !tripId) {
         setError("Decryption failed or missing IDs");
         return;
@@ -73,7 +83,7 @@ export default function Results({ onBack, user, onUpdateTrip }) {
           if (snapshot.exists()) {
             const tripData = { id: tripId, ...snapshot.data() };
             dispatch(setActiveTrip(tripData));
-            setTrip(structuredClone(tripData)); // update Redux once per change
+            // setTrip(structuredClone(tripData)); // update Redux once per change
             setLoading(false);
           } else {
             setError("Trip not found or deleted");
@@ -100,10 +110,11 @@ export default function Results({ onBack, user, onUpdateTrip }) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
         dispatch(setActiveTrip(null));
-        setTrip(null);
+        // setTrip(null);
       }
     };
   }, [param?.id]);
+
   const [saved, setSaved] = useState(Boolean(trip?.id)); // true if already has id
   useEffect(() => {
     async function loadWeather() {
@@ -120,7 +131,9 @@ export default function Results({ onBack, user, onUpdateTrip }) {
     loadWeather();
     async function loadSummary() {
       const text = await summarizeTrip(trip);
+      //onUpdateTrip({ ...trip, summary: text });
       setSummary(text);
+      setTripSummary(text);
     }
     loadSummary();
   }, [trip]);
@@ -169,7 +182,8 @@ export default function Results({ onBack, user, onUpdateTrip }) {
         <div>
           <h2 className="text-2xl font-bold">{trip.title}</h2>
           <div className="text-sm text-gray-500">
-            {trip.days.length} days • Budget. ₹{trip.budget} • Est. ₹{trip.costEstimate}
+            {trip.days.length} days • Budget. ₹{trip.budget} • Est. ₹
+            {trip.costEstimate}
           </div>
         </div>
         <div className="flex gap-2">
@@ -213,7 +227,7 @@ export default function Results({ onBack, user, onUpdateTrip }) {
                       key={idx}
                       className="relative p-3 border rounded-lg flex items-start gap-3 group hover:shadow-md transition"
                     >
-                      <button
+                      {/* <button
                         onClick={() => {
                           const updatedTrip = structuredClone(trip);
                           const dayIndex = updatedTrip.days.findIndex(
@@ -223,6 +237,33 @@ export default function Results({ onBack, user, onUpdateTrip }) {
                             dayIndex
                           ].items.filter((_, i) => i !== idx);
                           onUpdateTrip(updatedTrip);
+                        }}
+                        className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
+                        title="Remove activity"
+                      >
+                        <Trash2 size={16} />
+                      </button> */}
+                      <button
+                        onClick={async () => {
+                          const confirm = await Swal.fire({
+                            title: "Delete activity?",
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonText: "Delete",
+                            confirmButtonColor: "#EF4444",
+                            cancelButtonColor: "#6B7280",
+                          });
+
+                          if (confirm.isConfirmed) {
+                            const updatedTrip = structuredClone(trip);
+                            const dayIndex = updatedTrip.days.findIndex(
+                              (day) => day.day === d.day
+                            );
+                            updatedTrip.days[dayIndex].items = updatedTrip.days[
+                              dayIndex
+                            ].items.filter((_, i) => i !== idx);
+                            onUpdateTrip(updatedTrip);
+                          }
                         }}
                         className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
                         title="Remove activity"
@@ -290,7 +331,8 @@ export default function Results({ onBack, user, onUpdateTrip }) {
               <button
                 onClick={async () => {
                   const weatherSummary = summarizeWeather(weather);
-
+                  onUpdateTrip({ ...trip, weatherSummary: weatherSummary });
+                  setTripWeatherSummary(weatherSummary);
                   // Ask Gemini how to adjust itinerary given weather
                   const aiUpdate = await refineTripWithGemini(
                     {
@@ -386,12 +428,22 @@ export default function Results({ onBack, user, onUpdateTrip }) {
               Days: {trip.days.length}
             </div>
             <div className="text-sm text-gray-600">
-              Est. Cost: ₹{trip.costEstimate}
+              Est. Cost: ₹{tripInsights?.totalCostEstimate?.toLocaleString()}
             </div>
 
             <div className="mt-3">
               <button
-                onClick={() => exportTripToPDF(trip, user)}
+                onClick={() =>
+                  exportTripToPDF(
+                    {
+                      ...trip,
+                      tripInsights: tripInsights,
+                      tripSummary: tripSummary,
+                      weatherSummary: weatherSummary,
+                    },
+                    user
+                  )
+                }
                 className="w-full px-3 py-2 bg-green-600 text-white rounded"
               >
                 Export PDF
@@ -420,7 +472,7 @@ export default function Results({ onBack, user, onUpdateTrip }) {
           onUpdateTrip(updatedTrip);
         }}
       />
-      <TripInsightsPanel trip={trip} />
+      <TripInsightsPanel trip={trip} setTripInsights={setTripInsights} />
       <BookingModal
         show={showBooking}
         item={selected}

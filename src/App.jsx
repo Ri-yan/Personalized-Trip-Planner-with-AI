@@ -285,6 +285,11 @@ export default function App() {
   }
   useEffect(() => {
     async function updateItinerary() {
+      if (trip != null && trip.id !== undefined && trip.id === "demo-1") {
+        dispatch(setActiveTrip(trip));
+        return;
+      }
+
       if (!user || !trip) return;
 
       try {
@@ -334,8 +339,8 @@ export default function App() {
                   //   generateTripPlan(tripData,user, navigate);
                   //   //navigate("/results", { state: { trip: tripData } });
                   // }}
-                  onGenerate={(trip) =>
-                    dispatch(generateActiveTrip({ trip, user, navigate }))
+                  onGenerate={(trip,callback) =>
+                    dispatch(generateActiveTrip({ trip, user, navigate,callback }))
                   }
                   user={user}
                   pastTrips={pastTrips}

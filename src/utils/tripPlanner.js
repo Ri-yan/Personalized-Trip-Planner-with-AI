@@ -43,12 +43,18 @@ export function formatResult(result) {
     return { error: "AI failed to generate valid response." };
   }
 }
-export async function generateTripPlan(formData, user, navigate) {
+export async function generateTripPlan(
+  formData,
+  user,
+  navigate,
+  callback = null
+) {
   try {
     // 1️⃣ Validate destination
     const coords = await fetchLatLng(formData.title);
     if (!coords?.lat || !coords?.lng) {
       alert("Please enter a valid destination.");
+      if (callback) callback();
       return;
     }
 
@@ -81,7 +87,7 @@ export async function generateTripPlan(formData, user, navigate) {
         restaurants: (restaurants || []).slice(0, 10),
         monuments: (monuments || []).slice(0, 10),
       },
-        weather: {
+      weather: {
         avgTemp:
           weather?.list?.length > 0
             ? (
@@ -131,7 +137,9 @@ export async function generateTripPlan(formData, user, navigate) {
       Rules:
       - Use 2–3 activities per day.
       - Pick real nearby places (use provided hotels, restaurants, monuments).
-      - Align activities with persona (${formData.persona}) and Interests {${formData.interests.join(", ")}}}.
+      - Align activities with persona (${
+        formData.persona
+      }) and Interests {${formData.interests.join(", ")}}}.
       - Keep total cost within budget (${formData.budget}).
       - Calculate the costEstimate.
       - If weather suggests rain, include indoor places (like museums or cafes).
@@ -179,6 +187,8 @@ export async function generateTripPlan(formData, user, navigate) {
           },
         ],
       };
+    } finally {
+      if (callback) callback();
     }
 
     // 6️⃣ Merge all pieces into a final trip object
@@ -201,11 +211,14 @@ export async function generateTripPlan(formData, user, navigate) {
       await setDoc(ref, tripData);
       console.log("✅ Trip saved to Firestore:", tripId);
     }
-    let data = {userId: user?.uid || "guest", tripId: tripId};
-    const eqs = crypto.encryptForUrl(data)
+    let data = { userId: user?.uid || "guest", tripId: tripId };
+    const eqs = crypto.encryptForUrl(data);
+    if (callback) callback();
     navigate(`/results/${eqs}`, { state: { trip: tripData } });
   } catch (error) {
     console.error("❌ Trip generation failed:", error);
     alert("Something went wrong while planning your trip. Please try again.");
+  } finally {
+    if (callback) callback();
   }
 }

@@ -45,8 +45,9 @@ export default function Onboarding({
       })),
       persona,
     };
-    onGenerate(trip);
-    setLoading(false);
+    onGenerate(trip, () => {
+      setLoading(false);
+    });
   }
 
   return (
@@ -123,6 +124,7 @@ export default function Onboarding({
             </button>
           </div>
         </div>
+        <p className="text-red-500 mb-4 px-2 mt-2">**You need to logged in to save trips and interract with real data.</p>
       </div>
 
       {/* RIGHT: TOP PICKS */}
@@ -163,7 +165,7 @@ export default function Onboarding({
 
           <button
             onClick={() => {
-              let data = { userId: user?.uid || "guest", tripId: null };
+              let data = { userId: "guest", tripId: "demo-1" };
               const eqs = crypto.encryptForUrl(data);
               navigate(`/results/${eqs}`);
             }}

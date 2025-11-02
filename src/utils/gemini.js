@@ -1,7 +1,7 @@
 // src/utils/gemini.js
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { fetchNearbyPlaces } from "./places";
-
+import Swal from "sweetalert2";
 const MODE = import.meta.env.VITE_AI_MODE || "studio";
 
 let studioModel = null;
@@ -70,10 +70,21 @@ async function runModel(prompt) {
     throw new Error("No valid AI model initialized.");
   } catch (err) {
     console.error("❌ Model execution failed:", err);
+
+    // 🚨 SweetAlert2 error notification
+    Swal.fire({
+      icon: "error",
+      title: "Model Execution Failed",
+      text:
+        err.message ||
+        "Sorry, something went wrong while generating your itinerary.",
+      footer: "Please try again or check your model configuration.",
+      confirmButtonColor: "#6366F1",
+    });
+
     return "Sorry, something went wrong while generating your itinerary.";
   }
 }
-
 /* -------------------------------------------------------------------------- */
 /* 💬 Public Exports (unchanged signatures)                                   */
 /* -------------------------------------------------------------------------- */
@@ -111,7 +122,9 @@ export async function aiAssistant(trip, userInput, weather) {
   try {
     const text = await runModel(prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : { mode: "chat", message: text };
+    return jsonMatch
+      ? JSON.parse(jsonMatch[0])
+      : { mode: "chat", message: text };
   } catch (err) {
     console.error("❌ aiAssistant error:", err);
     return { mode: "chat", message: "Sorry, something went wrong." };
@@ -202,7 +215,9 @@ export async function aiPlannerAgent(trip, userInput, weather, memory = []) {
 
 export async function getNearByRecommendation(trip, intent) {
   let aiReply = "Let me fetch some nearby options for you...";
-  const type = intent.toLowerCase().includes("hotel") ? "lodging" : "restaurant";
+  const type = intent.toLowerCase().includes("hotel")
+    ? "lodging"
+    : "restaurant";
 
   const places = await fetchNearbyPlaces({
     lat: trip.location?.lat,
