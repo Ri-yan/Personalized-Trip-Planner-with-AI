@@ -47,8 +47,7 @@ An AI-powered **travel planning web application** built with **React + Vite + Ta
 
 ---
 
----
-FINAL SUBMISSION
+## FINAL SUBMISSION
 [![Watch the video](https://media.istockphoto.com/id/1294828154/vector/find-meaning-in-life-silhouette-of-backpacker-on-hilltop.jpg?s=612x612&w=0&k=20&c=MS2OiIRns0zFmp_GyMMwf0q-YrYABHH6GgBiH6DSy9U=)](https://drive.google.com/file/d/1N9L6JwsyPzTH2aeSqhHg5EAOOIQb_DvN/view?usp=drive_link)
 
 
@@ -56,6 +55,9 @@ FINAL SUBMISSION
 ## Prototype DEMO 
 [![Watch the video](https://i.ytimg.com/vi/Zwk0ySQ0y10/sddefault.jpg)](https://drive.google.com/file/d/1N9L6JwsyPzTH2aeSqhHg5EAOOIQb_DvN/view?usp=drive_link)
 
+## FOR NERDS
+
+[GenAI Exchange Final .pdf](https://github.com/user-attachments/files/24368911/GenAI.Exchange.Final.pdf)
 
 
 ## 📂 Project Structure
