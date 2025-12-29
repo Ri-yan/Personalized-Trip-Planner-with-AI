@@ -63,8 +63,6 @@ An AI-powered **travel planning web application** built with **React + Vite + Ta
 
 👉 **[Open the Presentation (PDF)](GenAI.Exchange.Submission.pdf)**
 
-> GitHub will render this PDF in its built-in viewer (zoom, page nav supported).
-
 
 
 ## 📂 Project Structure
