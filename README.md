@@ -57,10 +57,6 @@ An AI-powered **travel planning web application** built with **React + Vite + Ta
 
 ## 📊 GenAI Exchange – Final Deck (For Nerds 🤓)
 
-[GenAI Exchange Final .pdf](https://github.com/user-attachments/files/24368911/GenAI.Exchange.Final.pdf)
-
-## 📊 GenAI Exchange – Final Deck (For Nerds 🤓)
-
 👉 **[Open the Presentation (PDF)](GenAI.Exchange.Submission.pdf)**
 
 
