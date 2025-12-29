@@ -1,6 +1,17 @@
 # 🌍 Smart Travel Planner
 
-An AI-powered **travel planning web application** built with **React + Vite + TailwindCSS**, designed to provide personalized trip suggestions, real-time weather insights, interactive maps, and seamless travel booking support.  
+An AI-powered **travel planning web application** built with **React + Vite + TailwindCSS**, designed to provide personalized trip suggestions, real-time weather insights, interactive maps, and seamless travel booking support. 
+
+Our AI-Powered Personalized Trip Planner transforms the way people plan and  experience travel.  
+It uses Google AI technologies (Gemini, Vertex AI, Maps API, Firebase, and BigQuery)  to deliver dynamic, budget-friendly, and interest-based itineraries.  
+Unlike static travel platforms, 
+our **solution**:  
+Adapts in real time to changes such as weather, delays, or personal preferences.  
+Creates unique travel personas to personalize recommendations for each traveler.  
+Provides seamless booking for end-to-end convenience.  
+Ensures global accessibility with multilingual interactive interfaces(future enhancement).  
+
+**USP**:Personalized, adaptive, and sustainable travel planning powered entirely by  Google AI
 
 ---
 
